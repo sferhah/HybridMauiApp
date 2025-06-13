@@ -1,0 +1,451 @@
+﻿@page "/myMapComponent"
+
+@using System.Reflection
+@using System.Text
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@using GoogleMapsComponents
+@using GoogleMapsComponents.Maps
+@using GoogleMapsComponents.Maps.Coordinates;
+@using GoogleMapsComponents.Maps.Extension;
+@using HybridMauiApp.Cartography
+@using Microsoft.JSInterop
+
+
+@inject IJSRuntime JS
+
+<style>
+    .gm-style-iw button {
+        display: none !important;
+    }
+
+    .updating-dot {
+    width: 20px;
+    height: 20px;
+    background-color: blue;
+    border: 3px solid white;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    animation: pulse 2s infinite;
+    }
+
+    @@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(0, 0, 255, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 30px 30px rgba(0, 0, 255, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(0, 0, 255, 0);
+    }
+    }
+</style>
+
+<script>
+    function setDotNetInstance(instance) {
+        window.dotNetInstance = instance;        
+    }    
+
+    async function onButtonClick(guid) {
+        await window.dotNetInstance.invokeMethodAsync('OnInfoWindowClicked', guid);
+    }
+
+
+    function addEventListenerToInfoWindow(guid) {        
+        document.querySelector('.gm-style-iw').addEventListener('click', async function () {
+        await window.dotNetInstance.invokeMethodAsync('OnInfoWindowClicked', guid);
+    });
+    }
+
+    function hidePoi(mapGuid) {
+
+    let map = blazorGoogleMaps.objectManager.mapObjects[mapGuid];
+
+    map.setOptions({
+        styles: [
+            {
+                featureType: "poi",
+                stylers: [{ visibility: "off" }],
+            },
+            {
+                featureType: "transit",                    
+                stylers: [{ visibility: "off" }],
+            },
+        ]
+        });
+    }
+
+</script>
+
+<GoogleMap @ref="@_map1" Id="map1" Height="@height" Options="@_mapOptions" OnAfterInit="async () => await OnAfterMapInit()"></GoogleMap>
+
+@code {
+    public interface IMyMapComponentListener
+    {   
+        void OnAfterMapInit(MyMapComponent? map);
+        void OnMapClicked(MauiPosition position);
+        void OnClusterClick(ICollection<MauiPin> pins);
+        void OnInfoWindowClicked(MauiPin pin);
+    }
+
+    [Parameter]
+    public IMyMapComponentListener? Listener { get; set; }    
+
+    [Parameter]
+    public bool ClusteringEnabled { get; set; }
+
+    [Parameter]
+    public MauiPosition? DefaultCenter { get; set; }
+
+    [Parameter]
+    public ControlPosition DefaultControlPosition { get; set; } = ControlPosition.TopLeft;
+
+
+    public GoogleMap _map1 = default!;
+    private string height = "100vh";
+
+    private MapOptions _mapOptions = default!;
+    private AdvancedMarkerElement? _userMarker;
+
+    private readonly List<MauiPin> _pins = new List<MauiPin>();
+
+    private MarkerClustering? _markerClustering;
+
+    protected override void OnParametersSet()
+    {
+        
+    }
+
+    protected override void OnInitialized()
+    {
+        _mapOptions = new MapOptions
+            {
+                Zoom = 13,
+                MapTypeControlOptions = new MapTypeControlOptions 
+                {
+                    Style = MapTypeControlStyle.Default,
+                    Position = DefaultControlPosition,
+                },
+                Center = DefaultCenter != null ? new LatLngLiteral
+                {
+                    Lat = DefaultCenter.Value.Latitude,
+                    Lng = DefaultCenter.Value.Longitude
+                } : new LatLngLiteral
+                {
+                    Lat = 36.6248851300317,
+                    Lng = 4.340352156036844
+                },
+                MapTypeId = MapTypeId.Roadmap,
+                FullscreenControl = false,       
+                ClickableIcons = false,
+                //Styles = new GoogleMapStyleBuilder().AddStyle("poi", null, (GoogleMapStyleVisibility)false).AddStyle("transit", null, (GoogleMapStyleVisibility)false).Build(),
+                Styles = new []
+                {
+                    new MapTypeStyle
+                    {
+                        elementType = "poi",
+                        stylers = new []
+                        {
+                            new GoogleMapStyleVisibility
+                            {
+                                visibility = "off",
+                            }
+                        }
+                    },
+                    new MapTypeStyle
+                    {
+                        elementType = "transit",
+                        stylers = new []
+                        {
+                            new GoogleMapStyleVisibility
+                            {
+                                visibility = "off",
+                            }
+                        }
+                    },
+                },
+                MapId = "DEMO_MAP_ID" // required for AdvancedMarkerElement usage
+            };
+
+    }
+
+    private async Task OnAfterMapInit()
+    {
+        await JS.InvokeVoidAsync("setDotNetInstance", DotNetObjectReference.Create(this));
+
+        await _map1.InteropObject.AddListener<MouseEvent>("click", async (e) => await OnClick(e));  
+        await _map1.InteropObject.AddListener("bounds_changed", OnBoundsChanged);
+        await _map1.InteropObject.AddListener("center_changed", OnCenterChanged);
+
+        //   await JS.InvokeVoidAsync("hidePoi", _map1.InteropObject.Guid);
+
+        Listener?.OnAfterMapInit(this);
+
+        if (ClusteringEnabled)
+        {
+            _markerClustering = await MarkerClustering.CreateAsync(_map1.JsRuntime, _map1.InteropObject, Enumerable.Empty<AdvancedMarkerElement>(), new MarkerClustererOptions
+            {
+                // RendererObjectName = "customRendererLib.interpolatedRenderer"
+            });
+
+            await _markerClustering.AddListener<System.Text.Json.JsonElement>("click", async (e) =>
+              {
+                  var positions = GetPositions(e).GroupBy(x => new { x.Lat, x.Lng }).Select(g => g.First()).ToList();
+
+                  var selected_pins = positions.SelectMany(marker => _pins.Where(x => x.Position.Latitude == marker.Lat && x.Position.Longitude == marker.Lng)).ToList();                
+
+                  if (_infoWindow != null)
+                  {
+                      await _infoWindow.Close();
+                  }
+
+                  Listener?.OnClusterClick(selected_pins);
+              });
+        }
+    }   
+
+
+    private void OnBoundsChanged()
+    {
+
+    }
+
+    private void OnCenterChanged()
+    {
+
+    }
+
+    public async Task ToggleMapType()
+    {
+        var mapTypeId= await _map1.InteropObject.GetMapTypeId();
+
+        MapTypeId[] values = Enum.GetValues<MapTypeId>();
+        mapTypeId = values[(Array.IndexOf(values, mapTypeId) + 1) % values.Length];
+
+        await _map1.InteropObject.SetMapTypeId(mapTypeId);
+    }
+
+
+    public async Task ReplacePins(IEnumerable<MauiPin> oldPins, IEnumerable<MauiPin> newPins)
+    {
+        if (oldPins.Any())
+        {
+            await RemovePins(oldPins);
+        }
+
+        if(newPins.Any())
+        {
+            await AddPins(newPins);
+        }        
+    }
+
+
+    public async Task AddPins(IEnumerable<MauiPin> pins)
+    {
+        var newPins = await Task.WhenAll(pins.Select(AddPin));        
+
+        if (_markerClustering != null)
+        {
+            await _markerClustering.AddMarkers(newPins.Select(x => (AdvancedMarkerElement)x.NativeObject));
+        }
+    }
+
+    InfoWindow? _infoWindow;
+    private async Task<MauiPin> AddPin(MauiPin pin)
+    {   
+        var advancedMarkerElementOptions = pin.ToAdvancedMarkerElementOptions();
+        advancedMarkerElementOptions.Map = _map1.InteropObject;
+        var advanced_marker = await AdvancedMarkerElement.CreateAsync(_map1.JsRuntime, advancedMarkerElementOptions);
+
+        pin.NativeObject = advanced_marker;
+        _pins.Add(pin);
+
+        await advanced_marker.AddListener("click", async () =>
+        {
+            if (_infoWindow != null)
+            {
+                await _infoWindow.Close();
+            }
+
+            _infoWindow = await InfoWindow.CreateAsync(_map1.JsRuntime, new InfoWindowOptions
+                {
+                    Content = System.Net.WebUtility.HtmlEncode(pin.Label).Replace("\n", "<br>"),
+                });
+
+            await _infoWindow.AddListener("domready", () => JS.InvokeVoidAsync("addEventListenerToInfoWindow", advanced_marker.Guid));
+            await _infoWindow.Open(_map1.InteropObject, advanced_marker);
+        });
+
+        return pin;
+    }
+
+
+    public async Task RemovePins(IEnumerable<MauiPin> pins)
+    {        
+        var oldMarkers = await Task.WhenAll(pins.Select(RemovePin));      
+
+        if (_markerClustering != null)
+        {
+            await _markerClustering.RemoveMarkers(oldMarkers.Where(x => x!= null).Select(x => x!));
+        }
+    }
+
+    private async Task<AdvancedMarkerElement?> RemovePin(MauiPin pin)
+    {   
+        var existing = _pins.FirstOrDefault(x => ((AdvancedMarkerElement)x.NativeObject).Guid == ((AdvancedMarkerElement)pin.NativeObject).Guid);
+
+        if (existing == null)
+        {
+            return null;
+        }
+
+        var marker = (AdvancedMarkerElement)existing.NativeObject;
+        await marker.SetMap(null);
+
+        _pins.Remove(existing);
+
+        return marker;
+    }
+
+    [JSInvokable]
+    public Task OnInfoWindowClicked(Guid guid)
+    {
+        var pin = _pins.FirstOrDefault(x => ((AdvancedMarkerElement)x.NativeObject).Guid == guid);
+
+        if (pin is not null)
+        {
+            Listener?.OnInfoWindowClicked(pin);
+        }
+
+        return Task.FromResult(0);
+    }
+
+
+    [JSInvokable]
+    public Task OnGeolocationPositionError(string errorJson)
+    {   
+        var error = JsonSerializer.Deserialize<GeolocationPositionError>(errorJson);
+
+        return Task.FromResult(0);
+    }
+
+    [JSInvokable]
+    public async Task OnNewLocation(double lat, double lng)
+    {
+        var position = new LatLngLiteral { Lat = lat, Lng = lng };
+        if (_userMarker == null)
+        {
+            _userMarker = await AdvancedMarkerElement.CreateAsync(_map1.JsRuntime, new AdvancedMarkerElementOptions
+                {
+                    Position = new LatLngLiteral { Lat = lat, Lng = lng },
+                    Map = _map1.InteropObject,
+                    Content = """<div class="updating-dot"></div>""",
+                });
+        }
+        else
+        {
+            await _userMarker.SetPosition(position);
+        }
+    }
+
+    public async Task SetCenter(MauiPosition latLngLiteral)
+    {
+        //await _map1.InteropObject.PanTo(latLngLiteral.ToLatLngLiteral());
+        await _map1.InteropObject.SetCenter(latLngLiteral.ToLatLngLiteral());
+
+        // fitBounds changes zoom, panToBounds does not
+    }
+
+
+
+    public async Task ClearClustering()
+    {
+        if (_markerClustering != null)
+        {
+            await _markerClustering.ClearMarkers();
+        }        
+    }
+
+
+    public static List<LatLngLiteral> GetPositions(JsonElement element)
+    {
+        List<LatLngLiteral> positions = new List<LatLngLiteral>();
+        TraversePositions(element);
+        return positions;
+
+        void TraversePositions(JsonElement element)
+        {
+            if (element.ValueKind == JsonValueKind.Object)
+            {
+                if (element.TryGetProperty("lat", out JsonElement latElement)
+                && latElement.ValueKind == JsonValueKind.Number
+                && latElement.TryGetDouble(out double latValue)
+                && element.TryGetProperty("lng", out JsonElement lngElement)
+                && lngElement.ValueKind == JsonValueKind.Number
+                && lngElement.TryGetDouble(out double lngValue))
+                {
+                    positions.Add(new LatLngLiteral(latValue, lngValue));
+                }
+
+                foreach (JsonProperty property in element.EnumerateObject())
+                {
+                    TraversePositions(property.Value);
+                }
+            }
+            else if (element.ValueKind == JsonValueKind.Array)
+            {
+                foreach (JsonElement item in element.EnumerateArray())
+                {
+                    TraversePositions(item);
+                }
+            }
+        }
+    }
+
+    public async Task FitBounds()
+    {
+        if (!_pins.Any())
+        {
+            return;
+        }
+
+        LatLngBoundsLiteral? boundsLiteral = new LatLngBoundsLiteral(new LatLngLiteral { Lat = _pins.First().Position.Latitude, Lng = _pins.First().Position.Longitude });
+        foreach (var literal in _pins)
+        {
+            LatLngBoundsLiteral.CreateOrExtend(ref boundsLiteral, new LatLngLiteral { Lat = literal.Position.Latitude, Lng = literal.Position.Longitude });
+        }
+
+        await _map1.InteropObject.FitBounds(boundsLiteral, OneOf.OneOf<int, GoogleMapsComponents.Maps.Coordinates.Padding>.FromT0(1));
+    }
+
+    public async Task<MapRegion?> GetBounds()
+    {        
+        return (await _map1.InteropObject.GetBounds())?.ToRegion();
+    }    
+    
+
+    private async Task OnClick(MouseEvent e)
+    {
+        if (_infoWindow != null)
+        {
+            await _infoWindow.Close();
+        }        
+
+        Listener?.OnMapClicked(new MauiPosition(e.LatLng.Lat, e.LatLng.Lng));
+    }
+
+    public class GeolocationPositionError
+    {
+        [JsonPropertyName("code")]
+        public int Code { get; set; }
+        [JsonPropertyName("message")]
+        public string? Message { get; set; }
+        public int PERMISSION_DENIED { get; set; }
+        public int POSITION_UNAVAILABLE { get; set; }
+        public int TIMEOUT { get; set; }
+    }
+}

@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>MauiApp1</title>
+    <title>Google Maps with HybridWebView</title>
+    <!--HybridWebView JS-->
+    <script src="HybridWebView.js"></script>
+    <script>
+        window.addEventListener(
+            "HybridWebViewMessageReceived",
+            function (e) {
+                alert("messageFromCSharp");
+            });
+    </script>
+
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+    </style>
+    <style>
+        /* hide InfoWindow close button */
+        .gm-style-iw button {
+            display: none !important;
+        }
+
+        /* CSS for the blue dot with white border and updating animation */
+        .updating-dot {
+            width: 15px;
+            height: 15px;
+            background-color: blue;
+            border: 3px solid white;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(0, 0, 255, 0.7);
+            }
+
+            50% {
+                box-shadow: 0 0 30px 30px rgba(0, 0, 255, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(0, 0, 255, 0);
+            }
+        }
+    </style>
+    <script>
+        var map = null;
+        var infoWindow = null;
+        var markerCluster = null;
+
+        let markersMap = new Map();
+        let AdvancedMarkerElement;
+        let PinElement;
+        
+        let _tcs = {};
+        _tcs.promise = new Promise((resolve, reject) => {
+            _tcs.resolve = resolve;
+            _tcs.reject = reject;
+        });
+
+        document.onreadystatechange = function () {
+            if (document.readyState == "complete") {
+                _tcs.resolve(true);
+            }
+        }
+
+        init();
+
+        async function init() {
+
+            let config = null;
+
+            try {
+                config = await window.HybridWebView.InvokeDotNet('GetGoogleMapsConfiguration');
+            } catch (error) {
+                setErrorMessage('Unable to obtain the api key. Be sure to expose the c# method GetGoogleMapsConfiguration().');
+                return;
+            }
+
+            try {
+                await loadScript('https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js');
+            } catch (error) {
+                setErrorMessage(getTranslation(config.Translations, 'GoogleMapsClusterLibraryLoadError'), getTranslation(config.Translations, 'Refresh'));
+                return;
+            }
+
+            try {
+                await loadScript(`https://maps.googleapis.com/maps/api/js?key=${config.ApiKey}&language=${config.Language}&loading=async&v=3&libraries=marker`);                
+                if (await loadLibrary()) {
+                    await initMap(config.Center, config.MapControlPosition);
+                } else {
+                    setErrorMessage(getTranslation(config.Translations, 'GoogleMapsMarkerLibraryLoadError'), getTranslation(config.Translations, 'Refresh'));
+                }                
+            } catch (error) {                
+                setErrorMessage(getTranslation(config.Translations, 'MapLoadFailure'), getTranslation(config.Translations, 'Refresh'));
+            }
+        }
+
+
+        function getTranslation(translations, key) {
+            return translations.hasOwnProperty(key) ? translations[key] : key;
+        }
+
+
+        async function loadScript(url) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = url;
+                script.async = true;
+                script.onload = () => resolve(script);
+                script.onerror = () => reject(new Error(`Error loading script: ${url}`));
+                document.head.appendChild(script);
+            });
+        }        
+
+        async function loadLibrary(retries = 3) {
+            while (retries > 0) {
+                try {
+                    if (!AdvancedMarkerElement || !PinElement) {
+                        const { AdvancedMarkerElement: AME, PinElement: PE } = await google.maps.importLibrary("marker");
+                        if (validateLibrary(AME, PE)) {
+                            AdvancedMarkerElement = AME;
+                            PinElement = PE;
+                            return true;
+                        }
+                    }
+                } catch (error) {
+                    console.error("Failed to load Google Maps Marker library:", error);
+                }
+                retries--;
+                await delay(1000);
+            }           
+
+            return false;
+        }
+
+
+        async function setErrorMessage(message, refreshText) {
+            await _tcs.promise;
+            document.getElementById('map').innerHTML
+                = `<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh;">
+                            <p style="margin-bottom: 10px;">${message}</p>
+                            <button onclick="location.reload()">${refreshText || 'Refresh'}</button>
+                           </div>`;
+        }
+
+        async function initMap(center, mapControlPosition) {
+
+            const positionMap = {
+                "TOP_LEFT": google.maps.ControlPosition.TOP_LEFT,
+                "TOP_CENTER": google.maps.ControlPosition.TOP_CENTER,
+                "TOP_RIGHT": google.maps.ControlPosition.TOP_RIGHT,
+                "BOTTOM_LEFT": google.maps.ControlPosition.BOTTOM_LEFT,
+                "BOTTOM_CENTER": google.maps.ControlPosition.BOTTOM_CENTER,
+                "BOTTOM_RIGHT": google.maps.ControlPosition.BOTTOM_RIGHT,
+                "LEFT_TOP": google.maps.ControlPosition.LEFT_TOP,
+                "LEFT_CENTER": google.maps.ControlPosition.LEFT_CENTER,
+                "LEFT_BOTTOM": google.maps.ControlPosition.LEFT_BOTTOM,
+                "RIGHT_TOP": google.maps.ControlPosition.RIGHT_TOP,
+                "RIGHT_CENTER": google.maps.ControlPosition.RIGHT_CENTER,
+                "RIGHT_BOTTOM": google.maps.ControlPosition.RIGHT_BOTTOM
+            };
+
+            const position = positionMap[mapControlPosition] || google.maps.ControlPosition.TOP_LEFT
+
+            var mapOptions = {
+                mapTypeControlOptions: {
+                    style: google.maps.MapTypeControlStyle.DEFAULT,
+                    position: position
+                },
+                zoom: 13,
+                center: { lat: center.Latitude, lng: center.Longitude },
+                mapTypeId: 'roadmap',
+                fullscreenControl: false,
+                clickableIcons: false,
+                styles: [
+                    {
+                        elementType: 'poi',
+                        stylers: [
+                            { visibility: 'off' }
+                        ]
+                    },
+                    {
+                        elementType: 'transit',
+                        stylers: [
+                            { visibility: 'off' }
+                        ]
+                    }
+                ],
+                mapId: 'DEMO_MAP_ID' // required for AdvancedMarkerElement usage, why DEMO ?
+            };
+
+            map = new google.maps.Map(document.getElementById('map'), mapOptions);
+
+            google.maps.event.addListenerOnce(map, 'idle', async function () {
+                try {
+                    await window.HybridWebView.InvokeDotNet('OnMapReady');
+                }
+                catch (error) {
+                    alert(error);
+                }
+            });
+
+            map.addListener("click", async (event) => {
+                if (infoWindow != null) {
+                    infoWindow.close();
+                }
+
+                try {
+                    await window.HybridWebView.InvokeDotNet('OnMapClicked', [event.latLng.lat(), event.latLng.lng()]);
+                }
+                catch (error) {
+                    alert(error);
+                }
+            });
+
+
+            const _emptyMarkers = [];
+
+            markerCluster = new markerClusterer.MarkerClusterer({
+                _emptyMarkers,
+                map,
+                onClusterClick: async function (event) {
+
+                    if (infoWindow != null) {
+                        infoWindow.close();
+                    }
+
+                    for (cluster of markerCluster.clusters.filter(x => x.bounds.contains(event.latLng))) {
+                        const markersInCluster = cluster.markers;
+
+                        markersInCluster.map(x => x.guid);
+
+                        try {
+                            await window.HybridWebView.InvokeDotNet('OnClusterClicked', [markersInCluster.map(x => x.guid)]);
+                        }
+                        catch (error) {
+                            alert(error);
+                        }
+                    }
+                }
+            });
+        }
+
+
+
+        function validateLibrary(AME, PE) {
+            // Check if AME and PE are classes
+            return AME && typeof AME === 'function' && AME.prototype && PE && typeof PE === 'function' && PE.prototype;
+        }
+
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function replacePins(oldPins, newPins) {
+            removePins(oldPins);
+            addPins(newPins);
+        }
+
+
+        function addPins(pins) {
+            if (pins.length > 0) {
+                const newMarkers = pins.map((pin) => addPin(pin));
+                if (markerCluster != null) {
+                    markerCluster.addMarkers(newMarkers);
+                }
+            }
+        }
+
+        function addPin(pin) {
+            const customPin = new PinElement({
+                background: pin.Background,
+                borderColor: pin.BorderColor,
+                glyphColor: pin.GlyphColor,
+                //glyph: 'A' // Example glyph
+            });
+
+            const marker = new AdvancedMarkerElement({
+                map: map,
+                position: {
+                    lat: pin.Position.Latitude, lng: pin.Position.Longitude
+                },
+                title: pin.Label,
+                content: customPin.element
+            });
+
+            markersMap.set(pin.Guid, marker);
+            marker.guid = pin.Guid;
+
+            marker.addListener('click', function () {
+
+                if (infoWindow != null) {
+                    infoWindow.close();
+                }
+
+                infoWindow = new google.maps.InfoWindow({
+                    content: `<div>${pin.Label}</div>`
+                });
+
+                google.maps.event.addListener(infoWindow, 'domready', function () {
+                    document.querySelector('.gm-style-iw').addEventListener('click', async function () {
+                        console.log('InfoWindow clicked');
+
+                        try {
+                            await window.HybridWebView.InvokeDotNet('OnInfoWindowClicked', marker.guid);
+                        }
+                        catch (error) {
+                            alert(error);
+                        }
+                    });
+                });
+
+                infoWindow.open(map, marker);
+            });
+
+            return marker;
+        }
+
+        function clearPins() {
+            if (markerCluster != null) {
+                markerCluster.clearMarkers();
+            }
+
+            for (marker of markers) {
+                marker.setMap(null);
+            }
+
+            markersMap.clear();
+        }
+
+        function removePins(pins) {
+
+            if (pins.length > 0) {
+                var oldMarkers = [];
+
+                for (pin of pins) {
+                    var marker = removePin(pin);
+                    if (marker != null) {
+                        oldMarkers.push(marker);
+                    }
+                }
+
+                if (markerCluster != null) {
+                    markerCluster.removeMarkers(oldMarkers);
+                }
+            }
+        }
+
+        function removePin(pin) {
+            marker = markersMap.get(pin.Guid);
+
+            if (marker == null) {
+                return null;
+            }
+
+            marker.setMap(null);
+            markersMap.delete(pin.Guid);
+            return marker;
+        }
+
+        function getBounds() {
+            const bounds = map.getBounds();
+
+            const northEast = bounds.getNorthEast();
+            const southWest = bounds.getSouthWest();
+            const center = bounds.getCenter();
+
+            var region = {
+                FarRight: { Latitude: northEast.lat(), Longitude: northEast.lng() },
+                NearLeft: { Latitude: southWest.lat(), Longitude: southWest.lng() },
+                // Center: { Latitude: center.lat(), Longitude: center.lng() },
+            };
+
+            return region;
+        }
+
+        function setCenter(lat, lng) {
+            map.setCenter({ lat: lat, lng: lng });
+        }
+
+        var _userMarker = null;
+        function onNewLocation(lat, lng) {
+            var position = { lat: lat, lng: lng };
+            if (_userMarker == null) {
+                const markerContent = document.createElement('div');
+                markerContent.className = 'updating-dot';
+
+                _userMarker = new AdvancedMarkerElement({
+                    map: map,
+                    position: position,
+                    content: markerContent,
+                });
+            }
+            else {
+                _userMarker.position = position;
+            }
+        }
+
+    </script>
+</head>
+<body>    
+    <div id="map" style="height: 100vh;"><img src="3-dots-fade.svg" style="display: block; margin: auto;" /></div>
+</body>
+</html>

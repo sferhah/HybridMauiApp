@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="HybridMauiApp.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:HybridMauiApp"
+    Title="HybridMauiApp">
+
+    <TabBar>
+        <Tab Title="RichText (js)">
+            <ShellContent
+                Title="RichText (js)"
+                ContentTemplate="{DataTemplate local:RichTextEditorHybridPage}"
+                Route="RichTextEditorHybrid" />
+        </Tab>
+        <Tab Title="GoogleMaps (Blazor)">
+            <ShellContent
+                Title="GoogleMaps (Blazor)"
+                ContentTemplate="{DataTemplate local:GoogleMapsBlazorPage}"
+                Route="GoogleMapsBlazor" />
+        </Tab>
+        <Tab Title="GoogleMaps (js)">
+            <ShellContent
+              Title="GoogleMaps (js)"
+              ContentTemplate="{DataTemplate local:GoogleMapsHybridPage}"
+              Route="GoogleMapsHybrid" />
+        </Tab>
+    </TabBar>
+
+    
+
+  
+</Shell>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>RichText example</title>
+
+    <link rel="stylesheet" href="css/site.css">
+    <link rel="stylesheet" href="src/richtext.min.css">
+    <script src="src/jquery.min.js"></script>
+    <script src="src/jquery.richtext.js"></script>
+    <script defer src="src/all.js"></script>
+    <!--HybridWebView JS-->
+    <script src="HybridWebView.js"></script>
+    <script>
+        window.addEventListener(
+            "HybridWebViewMessageReceived",
+            function (e) {
+                alert("messageFromCSharp");
+            });
+    </script>
+
+    <style>
+        .richText-help {
+            display: none !important;
+        }
+    </style>
+    <style>
+
+        :root {
+            --bg-color: #dfd9d3;
+            --richText-editor-bg-color: #FFFFFF;
+            --richText-editor-color: #000;
+            --richText-toolbar-bg-color: #FAFAFA;
+            --richText-toolbar-a-color: #333333;
+            --richText-toolbar-a-hover-bg-color: #aaa;
+            --richText-toolbar-ul-li-hover-bg-color: lightgray;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #20262c;
+            --richText-editor-bg-color: #333;
+            --richText-editor-color: #fff;
+            --richText-toolbar-bg-color: #444;
+            --richText-toolbar-a-color: #fff;
+            --richText-toolbar-a-hover-bg-color: #555;
+            --richText-toolbar-ul-li-hover-bg-color: darkgray;
+        }
+
+        body {
+            background-color: var(--bg-color) !important;
+        }
+
+        .richText .richText-editor {
+            background-color: var(--richText-editor-bg-color);
+            color: var(--richText-editor-color);
+        }
+
+        .richText .richText-toolbar {
+            background-color: var(--richText-toolbar-bg-color);
+        }
+
+            .richText .richText-toolbar a {
+                color: var(--richText-toolbar-a-color);
+            }
+
+                .richText .richText-toolbar a:hover {
+                    background-color: var(--richText-toolbar-a-hover-bg-color);
+                }
+
+            .richText .richText-toolbar ul li a:hover {
+                background-color: var(--richText-toolbar-ul-li-hover-bg-color);
+            }
+    </style>
+</head>
+<body spellcheck="false">
+
+
+<textarea id="content" class="content"></textarea>
+
+    <script>
+        init();
+
+        async function init() {
+            var config = await window.HybridWebView.InvokeDotNet('GetHybridRichTextConfig');
+            setTheme(config.IsDarkTheme);
+
+            $(document).ready(async function () {
+                $('.content').richText({
+                    callback: function () {
+                        window.HybridWebView.InvokeDotNet('OnRichTextReady');
+                    },
+
+                    // title
+                    heading: false,
+
+                    // fonts
+                    fonts: false,
+
+                    fontColor: false,
+                    backgroundColor: false,
+                    fontSize: false,
+
+                    // uploads
+                    imageUpload: false,
+                    fileUpload: false,
+
+                    // media
+                    videoEmbed: false,
+
+                    // link
+                    urls: false,
+
+                    // tables
+                    table: false,
+
+                    // code
+                    removeStyles: false,
+                    code: false,
+
+                    translations: config.Translations,
+                });
+            });      
+        }
+
+
+        function setTheme(isDarkTheme) {
+            if (isDarkTheme) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+            else {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        }
+
+
+        function setHtml(value) {
+            $('#content').val(value).trigger('change');
+        }
+
+        function getHtml() {
+            return $('#content').val();
+        }
+    </script>
+
+</body>
+</html>
