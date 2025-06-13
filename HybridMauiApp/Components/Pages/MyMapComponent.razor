@@ -130,15 +130,7 @@
                     Style = MapTypeControlStyle.Default,
                     Position = DefaultControlPosition,
                 },
-                Center = DefaultCenter != null ? new LatLngLiteral
-                {
-                    Lat = DefaultCenter.Value.Latitude,
-                    Lng = DefaultCenter.Value.Longitude
-                } : new LatLngLiteral
-                {
-                    Lat = 36.6248851300317,
-                    Lng = 4.340352156036844
-                },
+                Center = DefaultCenter != null ? new LatLngLiteral(DefaultCenter.Value.Latitude,DefaultCenter.Value.Longitude) : new LatLngLiteral(36.6248851300317,4.340352156036844),
                 MapTypeId = MapTypeId.Roadmap,
                 FullscreenControl = false,       
                 ClickableIcons = false,
@@ -336,12 +328,12 @@
     [JSInvokable]
     public async Task OnNewLocation(double lat, double lng)
     {
-        var position = new LatLngLiteral { Lat = lat, Lng = lng };
+        var position = new LatLngLiteral(lat, lng);
         if (_userMarker == null)
         {
             _userMarker = await AdvancedMarkerElement.CreateAsync(_map1.JsRuntime, new AdvancedMarkerElementOptions
                 {
-                    Position = new LatLngLiteral { Lat = lat, Lng = lng },
+                    Position = new LatLngLiteral(lat, lng),
                     Map = _map1.InteropObject,
                     Content = """<div class="updating-dot"></div>""",
                 });
@@ -413,10 +405,10 @@
             return;
         }
 
-        LatLngBoundsLiteral? boundsLiteral = new LatLngBoundsLiteral(new LatLngLiteral { Lat = _pins.First().Position.Latitude, Lng = _pins.First().Position.Longitude });
+        LatLngBoundsLiteral? boundsLiteral = new LatLngBoundsLiteral(new LatLngLiteral(_pins.First().Position.Latitude, _pins.First().Position.Longitude));
         foreach (var literal in _pins)
         {
-            LatLngBoundsLiteral.CreateOrExtend(ref boundsLiteral, new LatLngLiteral { Lat = literal.Position.Latitude, Lng = literal.Position.Longitude });
+            LatLngBoundsLiteral.CreateOrExtend(ref boundsLiteral, new LatLngLiteral(literal.Position.Latitude, literal.Position.Longitude));
         }
 
         await _map1.InteropObject.FitBounds(boundsLiteral, OneOf.OneOf<int, GoogleMapsComponents.Maps.Coordinates.Padding>.FromT0(1));

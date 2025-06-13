@@ -60,7 +60,7 @@
 	</ItemGroup>	
 
 	<ItemGroup>
-		<PackageReference Include="BlazorGoogleMaps" Version="4.12.2" />		
+		<PackageReference Include="BlazorGoogleMaps" Version="4.13.0" />		
 		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.80" />
 		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.80" />
 		<PackageReference Include="CommunityToolkit.Maui" Version="12.0.0" />
