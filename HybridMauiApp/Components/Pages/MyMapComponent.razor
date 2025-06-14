@@ -16,7 +16,7 @@
 
 <style>
     .gm-style-iw button {
-        display: none !important;
+    display: none !important;
     }
 
     .updating-dot {
@@ -34,30 +34,32 @@
 
     @@keyframes pulse {
     0% {
-        box-shadow: 0 0 0 0 rgba(0, 0, 255, 0.7);
+    box-shadow: 0 0 0 0 rgba(0, 0, 255, 0.7);
     }
+
     50% {
-        box-shadow: 0 0 30px 30px rgba(0, 0, 255, 0);
+    box-shadow: 0 0 30px 30px rgba(0, 0, 255, 0);
     }
+
     100% {
-        box-shadow: 0 0 0 0 rgba(0, 0, 255, 0);
+    box-shadow: 0 0 0 0 rgba(0, 0, 255, 0);
     }
     }
 </style>
 
 <script>
     function setDotNetInstance(instance) {
-        window.dotNetInstance = instance;        
-    }    
+    window.dotNetInstance = instance;
+    }
 
     async function onButtonClick(guid) {
-        await window.dotNetInstance.invokeMethodAsync('OnInfoWindowClicked', guid);
+    await window.dotNetInstance.invokeMethodAsync('OnInfoWindowClicked', guid);
     }
 
 
-    function addEventListenerToInfoWindow(guid) {        
-        document.querySelector('.gm-style-iw').addEventListener('click', async function () {
-        await window.dotNetInstance.invokeMethodAsync('OnInfoWindowClicked', guid);
+    function addEventListenerToInfoWindow(guid) {
+    document.querySelector('.gm-style-iw').addEventListener('click', async function () {
+    await window.dotNetInstance.invokeMethodAsync('OnInfoWindowClicked', guid);
     });
     }
 
@@ -66,17 +68,17 @@
     let map = blazorGoogleMaps.objectManager.mapObjects[mapGuid];
 
     map.setOptions({
-        styles: [
-            {
-                featureType: "poi",
-                stylers: [{ visibility: "off" }],
-            },
-            {
-                featureType: "transit",                    
-                stylers: [{ visibility: "off" }],
-            },
-        ]
-        });
+    styles: [
+    {
+    featureType: "poi",
+    stylers: [{ visibility: "off" }],
+    },
+    {
+    featureType: "transit",
+    stylers: [{ visibility: "off" }],
+    },
+    ]
+    });
     }
 
 </script>
@@ -85,7 +87,7 @@
 
 @code {
     public interface IMyMapComponentListener
-    {   
+    {
         void OnAfterMapInit(MyMapComponent? map);
         void OnMapClicked(MauiPosition position);
         void OnClusterClick(ICollection<MauiPin> pins);
@@ -93,7 +95,7 @@
     }
 
     [Parameter]
-    public IMyMapComponentListener? Listener { get; set; }    
+    public IMyMapComponentListener? Listener { get; set; }
 
     [Parameter]
     public bool ClusteringEnabled { get; set; }
@@ -117,7 +119,7 @@
 
     protected override void OnParametersSet()
     {
-        
+
     }
 
     protected override void OnInitialized()
@@ -125,18 +127,18 @@
         _mapOptions = new MapOptions
             {
                 Zoom = 13,
-                MapTypeControlOptions = new MapTypeControlOptions 
+                MapTypeControlOptions = new MapTypeControlOptions
                 {
                     Style = MapTypeControlStyle.Default,
                     Position = DefaultControlPosition,
                 },
-                Center = DefaultCenter != null ? new LatLngLiteral(DefaultCenter.Value.Latitude,DefaultCenter.Value.Longitude) : new LatLngLiteral(36.6248851300317,4.340352156036844),
+                Center = DefaultCenter != null ? new LatLngLiteral(DefaultCenter.Value.Latitude, DefaultCenter.Value.Longitude) : new LatLngLiteral(36.6248851300317, 4.340352156036844),
                 MapTypeId = MapTypeId.Roadmap,
-                FullscreenControl = false,       
+                FullscreenControl = false,
                 ClickableIcons = false,
-                //Styles = new GoogleMapStyleBuilder().AddStyle("poi", null, (GoogleMapStyleVisibility)false).AddStyle("transit", null, (GoogleMapStyleVisibility)false).Build(),
-                Styles = new []
-                {
+            //Styles = new GoogleMapStyleBuilder().AddStyle("poi", null, (GoogleMapStyleVisibility)false).AddStyle("transit", null, (GoogleMapStyleVisibility)false).Build(),
+                Styles = new[]
+                    {
                     new MapTypeStyle
                     {
                         elementType = "poi",
@@ -169,7 +171,7 @@
     {
         await JS.InvokeVoidAsync("setDotNetInstance", DotNetObjectReference.Create(this));
 
-        await _map1.InteropObject.AddListener<MouseEvent>("click", async (e) => await OnClick(e));  
+        await _map1.InteropObject.AddListener<MouseEvent>("click", async (e) => await OnClick(e));
         await _map1.InteropObject.AddListener("bounds_changed", OnBoundsChanged);
         await _map1.InteropObject.AddListener("center_changed", OnCenterChanged);
 
@@ -179,16 +181,16 @@
 
         if (ClusteringEnabled)
         {
+            //  the lib does not expose the "onClusterClick" delegate as a parameter
             _markerClustering = await MarkerClustering.CreateAsync(_map1.JsRuntime, _map1.InteropObject, Enumerable.Empty<AdvancedMarkerElement>(), new MarkerClustererOptions
             {
                 // RendererObjectName = "customRendererLib.interpolatedRenderer"
             });
 
-            await _markerClustering.AddListener<System.Text.Json.JsonElement>("click", async (e) =>
+            // 1. workaround for "onClusterClick": AddListener<T> causes System.Text.Json to crash due to excessive depth
+            await _markerClustering.AddListener<GoogleClusterClickEvent>("click", async (e) =>
               {
-                  var positions = GetPositions(e).GroupBy(x => new { x.Lat, x.Lng }).Select(g => g.First()).ToList();
-
-                  var selected_pins = positions.SelectMany(marker => _pins.Where(x => x.Position.Latitude == marker.Lat && x.Position.Longitude == marker.Lng)).ToList();                
+                  var selected_pins = e.Markers.SelectMany(marker => _pins.Where(x => x.Position.Latitude == marker.Position.Lat && x.Position.Longitude == marker.Position.Lng)).ToList();
 
                   if (_infoWindow != null)
                   {
@@ -197,8 +199,29 @@
 
                   Listener?.OnClusterClick(selected_pins);
               });
+
+            // 2. workaround for "onClusterClick": AddListener<T> causes System.Text.Json to crash due to excessive depth
+            await _markerClustering.AddListener<System.Text.Json.JsonElement>("click", async (e) =>
+              {
+                  var positions = GetPositions(e).GroupBy(x => new { x.Lat, x.Lng }).Select(g => g.First()).ToList();
+
+                  var selected_pins = positions.SelectMany(marker => _pins.Where(x => x.Position.Latitude == marker.Lat && x.Position.Longitude == marker.Lng)).ToList();
+
+                  if (_infoWindow != null)
+                  {
+                      await _infoWindow.Close();
+                  }
+
+                  Listener?.OnClusterClick(selected_pins);
+              });
+
+            // 3. workaround for "onClusterClick": The non-generic is properly fired but the cluster is missing
+            await _markerClustering.AddListener("click", () =>
+              {
+                  Listener?.OnClusterClick([]);
+              });
         }
-    }   
+    }
 
 
     private void OnBoundsChanged()
@@ -213,7 +236,7 @@
 
     public async Task ToggleMapType()
     {
-        var mapTypeId= await _map1.InteropObject.GetMapTypeId();
+        var mapTypeId = await _map1.InteropObject.GetMapTypeId();
 
         MapTypeId[] values = Enum.GetValues<MapTypeId>();
         mapTypeId = values[(Array.IndexOf(values, mapTypeId) + 1) % values.Length];
@@ -229,16 +252,16 @@
             await RemovePins(oldPins);
         }
 
-        if(newPins.Any())
+        if (newPins.Any())
         {
             await AddPins(newPins);
-        }        
+        }
     }
 
 
     public async Task AddPins(IEnumerable<MauiPin> pins)
     {
-        var newPins = await Task.WhenAll(pins.Select(AddPin));        
+        var newPins = await Task.WhenAll(pins.Select(AddPin));
 
         if (_markerClustering != null)
         {
@@ -248,7 +271,7 @@
 
     InfoWindow? _infoWindow;
     private async Task<MauiPin> AddPin(MauiPin pin)
-    {   
+    {
         var advancedMarkerElementOptions = pin.ToAdvancedMarkerElementOptions();
         advancedMarkerElementOptions.Map = _map1.InteropObject;
         var advanced_marker = await AdvancedMarkerElement.CreateAsync(_map1.JsRuntime, advancedMarkerElementOptions);
@@ -277,17 +300,17 @@
 
 
     public async Task RemovePins(IEnumerable<MauiPin> pins)
-    {        
-        var oldMarkers = await Task.WhenAll(pins.Select(RemovePin));      
+    {
+        var oldMarkers = await Task.WhenAll(pins.Select(RemovePin));
 
         if (_markerClustering != null)
         {
-            await _markerClustering.RemoveMarkers(oldMarkers.Where(x => x!= null).Select(x => x!));
+            await _markerClustering.RemoveMarkers(oldMarkers.Where(x => x != null).Select(x => x!));
         }
     }
 
     private async Task<AdvancedMarkerElement?> RemovePin(MauiPin pin)
-    {   
+    {
         var existing = _pins.FirstOrDefault(x => ((AdvancedMarkerElement)x.NativeObject).Guid == ((AdvancedMarkerElement)pin.NativeObject).Guid);
 
         if (existing == null)
@@ -319,7 +342,7 @@
 
     [JSInvokable]
     public Task OnGeolocationPositionError(string errorJson)
-    {   
+    {
         var error = JsonSerializer.Deserialize<GeolocationPositionError>(errorJson);
 
         return Task.FromResult(0);
@@ -359,7 +382,7 @@
         if (_markerClustering != null)
         {
             await _markerClustering.ClearMarkers();
-        }        
+        }
     }
 
 
@@ -415,17 +438,17 @@
     }
 
     public async Task<MapRegion?> GetBounds()
-    {        
+    {
         return (await _map1.InteropObject.GetBounds())?.ToRegion();
-    }    
-    
+    }
+
 
     private async Task OnClick(MouseEvent e)
     {
         if (_infoWindow != null)
         {
             await _infoWindow.Close();
-        }        
+        }
 
         Listener?.OnMapClicked(new MauiPosition(e.LatLng.Lat, e.LatLng.Lng));
     }

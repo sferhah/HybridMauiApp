@@ -41,6 +41,12 @@ public partial class GoogleMapsBlazorPage : ContentPage
 
     private async void MyMap_ClusterClicked(object? sender, ClusterClickedEventArgs e)
     {
+        if (e.Pins.Count == 0)
+        {
+            await DisplayAlert("Error", "Feature no longer available with Blazor (BlazorGoogleMaps lib), use the js page", "Ok");
+            return;
+        }
+
         var clusterAsString = string.Join("\n", e.Pins.Select(p => p.BindingContext).OfType<EntityViewModel>().Select(i => i.Label));
         await DisplayAlert("Cluster", $"{clusterAsString}", "Ok");
     }
