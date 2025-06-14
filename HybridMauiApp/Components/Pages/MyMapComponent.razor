@@ -272,7 +272,7 @@
     InfoWindow? _infoWindow;
     private async Task<MauiPin> AddPin(MauiPin pin)
     {
-        var advancedMarkerElementOptions = pin.ToAdvancedMarkerElementOptions();
+        var advancedMarkerElementOptions = ToAdvancedMarkerElementOptions(pin);
         advancedMarkerElementOptions.Map = _map1.InteropObject;
         var advanced_marker = await AdvancedMarkerElement.CreateAsync(_map1.JsRuntime, advancedMarkerElementOptions);
 
@@ -288,7 +288,12 @@
 
             _infoWindow = await InfoWindow.CreateAsync(_map1.JsRuntime, new InfoWindowOptions
                 {
-                    Content = System.Net.WebUtility.HtmlEncode(pin.Label).Replace("\n", "<br>"),
+                    Content = System.Net.WebUtility.HtmlEncode(pin.Label ?? "")
+            .Replace("\r\n", "\r")
+            .Replace("\n", "\r")
+            .Replace("\r", "<br>")
+            .Replace("\t", "&nbsp;&nbsp;&nbsp;&nbsp;")
+            .Replace("  ", " &nbsp;"),
                 });
 
             await _infoWindow.AddListener("domready", () => JS.InvokeVoidAsync("addEventListenerToInfoWindow", advanced_marker.Guid));
@@ -297,6 +302,24 @@
 
         return pin;
     }
+
+    private static AdvancedMarkerElementOptions ToAdvancedMarkerElementOptions(MauiPin pin)
+    {
+        var color = pin.Color ?? Colors.Red;
+
+        return new AdvancedMarkerElementOptions
+            {
+                Position = ToLatLngLiteral(pin.Position),
+                Content = new PinElement
+                {
+                    BorderColor = color.WithLuminosity(color.GetLuminosity() * 0.8f).ToRgbaHex(),
+                    Background = color.ToRgbaHex(),
+                    GlyphColor = color.WithLuminosity(color.GetLuminosity() * 0.6f).ToRgbaHex(),
+                }
+            };
+    }
+
+    private static LatLngLiteral ToLatLngLiteral(MauiPosition position) => new LatLngLiteral(position.Latitude, position.Longitude);
 
 
     public async Task RemovePins(IEnumerable<MauiPin> pins)
@@ -367,10 +390,10 @@
         }
     }
 
-    public async Task SetCenter(MauiPosition latLngLiteral)
+    public async Task SetCenter(MauiPosition position)
     {
-        //await _map1.InteropObject.PanTo(latLngLiteral.ToLatLngLiteral());
-        await _map1.InteropObject.SetCenter(latLngLiteral.ToLatLngLiteral());
+        //await _map1.InteropObject.PanTo(ToLatLngLiteral(position));
+        await _map1.InteropObject.SetCenter(ToLatLngLiteral(position));
 
         // fitBounds changes zoom, panToBounds does not
     }
@@ -439,7 +462,8 @@
 
     public async Task<MapRegion?> GetBounds()
     {
-        return (await _map1.InteropObject.GetBounds())?.ToRegion();
+        var bounds = await _map1.InteropObject.GetBounds();
+        return bounds == null ? null : new MapRegion { NearLeft = new MauiPosition(bounds.South, bounds.West), FarRight = new MauiPosition(bounds.North, bounds.East) };
     }
 
 

@@ -13,6 +13,12 @@
             <Button Text="Add pin" Command="{Binding AddPinCommand}" />
             <Button Text="My position" Clicked="MyPositionButton_Clicked" />
         </StackLayout>
+        <Label Text="Cluster click event does not work with blazor, use the js page"
+               HorizontalOptions="Center"
+               VerticalOptions="End"
+               Margin="0,0,0,20"
+               FontSize="Medium"
+               TextColor="Red" />
     </Grid>    
 
 </ContentPage>

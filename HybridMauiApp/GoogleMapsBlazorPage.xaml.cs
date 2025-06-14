@@ -10,8 +10,8 @@ public partial class GoogleMapsBlazorPage : ContentPage
     {
         BindingContext = new GeolocationPageViewModel
         {
-            MoveToPosition = (Core.CrossPosition position) => this.MyMap.SetCenter(position.ToGoogleMapsPoition()),
-            RetrieveCenterPosition = async () => ((await this.MyMap.GetBounds())?.Center)?.FromGoogleMapsPoition()
+            MoveToPosition = (Core.CrossPosition position) => this.MyMap.SetCenter(position.ToMauiPosition()),
+            RetrieveCenterPosition = async () => ((await this.MyMap.GetBounds())?.Center)?.FromMauiPosition()
         };
 
         InitializeComponent();
