@@ -96,7 +96,7 @@
             }
 
             try {
-                await loadScript('https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js');
+                await loadScript('https://unpkg.com/@googlemaps/markerclusterer@2.6.2/dist/index.min.js');
             } catch (error) {
                 setErrorMessage(getTranslation(config.Translations, 'GoogleMapsClusterLibraryLoadError'), getTranslation(config.Translations, 'Refresh'));
                 return;
@@ -238,23 +238,17 @@
             markerCluster = new markerClusterer.MarkerClusterer({
                 _emptyMarkers,
                 map,
-                onClusterClick: async function (event) {
+                onClusterClick: async function (e, cluster, map) {
 
                     if (infoWindow != null) {
                         infoWindow.close();
                     }
 
-                    for (cluster of markerCluster.clusters.filter(x => x.bounds.contains(event.latLng))) {
-                        const markersInCluster = cluster.markers;
-
-                        markersInCluster.map(x => x.guid);
-
-                        try {
-                            await window.HybridWebView.InvokeDotNet('OnClusterClicked', [markersInCluster.map(x => x.guid)]);
-                        }
-                        catch (error) {
-                            alert(error);
-                        }
+                    try {
+                        await window.HybridWebView.InvokeDotNet('OnClusterClicked', [cluster.markers.map(x => x.guid)]);
+                    }
+                    catch (error) {
+                        alert(error);
                     }
                 }
             });

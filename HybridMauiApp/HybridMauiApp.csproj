@@ -60,17 +60,17 @@
 	</ItemGroup>	
 
 	<ItemGroup>
-		<PackageReference Include="BlazorGoogleMaps" Version="4.13.0" />		
-		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.80" />
-		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.80" />
-		<PackageReference Include="CommunityToolkit.Maui" Version="12.0.0" />
+		<PackageReference Include="BlazorGoogleMaps" Version="4.13.7" />		
+		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.120" />
+		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.120" />
+		<PackageReference Include="CommunityToolkit.Maui" Version="12.2.0" />
 		<PackageReference Include="CommunityToolkit.Maui.Markup" Version="6.0.1" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.6" />
-		<PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="9.0.80" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.10" />
+		<PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="9.0.120" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="WinUIEx" Version="2.5.1" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'" />
+		<PackageReference Include="WinUIEx" Version="2.7.0" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'" />
 	</ItemGroup>
 
 	<ItemGroup>

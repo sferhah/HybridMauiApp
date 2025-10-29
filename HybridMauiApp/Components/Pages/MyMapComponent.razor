@@ -190,7 +190,7 @@
             // 1. workaround for "onClusterClick": AddListener<T> causes System.Text.Json to crash due to excessive depth
             await _markerClustering.AddListener<GoogleClusterClickEvent>("click", async (e) =>
               {
-                  var selected_pins = e.Markers.SelectMany(marker => _pins.Where(x => x.Position.Latitude == marker.Position.Lat && x.Position.Longitude == marker.Position.Lng)).ToList();
+                  var selected_pins = e.Markers.Where(x=> x != null).SelectMany(marker => _pins.Where(x => x.Position.Latitude == marker.Position.Lat && x.Position.Longitude == marker.Position.Lng)).ToList();
 
                   if (_infoWindow != null)
                   {
