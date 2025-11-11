@@ -55,6 +55,11 @@ public partial class GoogleMapsBlazorPage : ContentPage
     {
         var permission = await Permissions.CheckStatusAsync<Permissions.LocationWhenInUse>().ConfigureAwait(true);
 
+        if (permission != PermissionStatus.Granted)
+        {
+            permission = await Permissions.RequestAsync<Permissions.LocationWhenInUse>().ConfigureAwait(true);
+        }
+
         if (permission == PermissionStatus.Granted)
         {
             var position = await Geolocation.GetLastKnownLocationAsync();
