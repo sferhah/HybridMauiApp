@@ -12,18 +12,39 @@
                 Title="RichText (js)"
                 ContentTemplate="{DataTemplate local:RichTextEditorHybridPage}"
                 Route="RichTextEditorHybrid" />
+            <Tab.Icon>
+                <FontImageSource
+                  Glyph="&#xf15c;"                  
+                  FontFamily="FontAwesomeSolid"
+                  Color="{AppThemeBinding Light=Black, Dark=White}" 
+                  Size="20" />
+            </Tab.Icon>
         </Tab>
         <Tab Title="GoogleMaps (Blazor)">
             <ShellContent
                 Title="GoogleMaps (Blazor)"
                 ContentTemplate="{DataTemplate local:GoogleMapsBlazorPage}"
                 Route="GoogleMapsBlazor" />
+            <Tab.Icon>
+                <FontImageSource
+                  Glyph="&#xf5a0;"
+                  FontFamily="FontAwesomeSolid"
+                  Color="{AppThemeBinding Light=Black, Dark=White}" 
+                  Size="20" />
+            </Tab.Icon>
         </Tab>
         <Tab Title="GoogleMaps (js)">
             <ShellContent
               Title="GoogleMaps (js)"
               ContentTemplate="{DataTemplate local:GoogleMapsHybridPage}"
               Route="GoogleMapsHybrid" />
+            <Tab.Icon>
+                <FontImageSource
+                  Glyph="&#xf59f;"                  
+                  FontFamily="FontAwesomeSolid"
+                  Color="{AppThemeBinding Light=Black, Dark=White}" 
+                  Size="20" />
+            </Tab.Icon>
         </Tab>
     </TabBar>
 
