@@ -58,6 +58,10 @@ public partial class GoogleMapsBlazorPage : ContentPage
         if (permission != PermissionStatus.Granted)
         {
             permission = await Permissions.RequestAsync<Permissions.LocationWhenInUse>().ConfigureAwait(true);
+            if (permission == PermissionStatus.Granted)
+            {
+                await MyMap.ToggleLocationAsync(true);
+            }
         }
 
         if (permission == PermissionStatus.Granted)

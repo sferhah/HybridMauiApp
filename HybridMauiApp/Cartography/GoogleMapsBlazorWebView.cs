@@ -46,33 +46,45 @@ public partial class GoogleMapsBlazorWebView : BlazorWebView, MyMapComponent.IMy
 
     private void GoogleMapsBlazorWebView_Unloaded(object? sender, EventArgs e)
     {
-        Geolocation.LocationChanged -= Geolocation_LocationChanged;
-        Geolocation.StopListeningForeground();
+        _ = ToggleLocationAsync(false);
     }
 
-    private async void GoogleMapsBlazorWebView_Loaded(object? sender, EventArgs e)
+    private void GoogleMapsBlazorWebView_Loaded(object? sender, EventArgs e)
     {
-        var permission = await Permissions.CheckStatusAsync<Permissions.LocationWhenInUse>().ConfigureAwait(true);
+        _ = ToggleLocationAsync(true);
+    }
 
-        if (permission == PermissionStatus.Granted)
+    public async Task ToggleLocationAsync(bool toggleOn)
+    {
+        if (toggleOn)
         {
-            var position = await Geolocation.GetLastKnownLocationAsync()
-                    ?? await Geolocation.GetLocationAsync(new GeolocationRequest(GeolocationAccuracy.Default, TimeSpan.FromSeconds(20)));
+            var permission = await Permissions.CheckStatusAsync<Permissions.LocationWhenInUse>().ConfigureAwait(true);
 
-            if (position != null)
+            if (permission == PermissionStatus.Granted)
             {
-                await (await GetMapAsync()).OnNewLocation(position.Latitude, position.Longitude);
-            }
+                var position = await Geolocation.GetLastKnownLocationAsync()
+                        ?? await Geolocation.GetLocationAsync(new GeolocationRequest(GeolocationAccuracy.Default, TimeSpan.FromSeconds(20)));
 
-            while (Geolocation.IsListeningForeground)
-            {
-                await Task.Delay(300);
-            }
+                if (position != null)
+                {
+                    await (await GetMapAsync()).OnNewLocation(position.Latitude, position.Longitude);
+                }
 
-            if (await Geolocation.StartListeningForegroundAsync(new GeolocationListeningRequest(GeolocationAccuracy.Best, TimeSpan.FromSeconds(5))))
-            {
-                Geolocation.LocationChanged += Geolocation_LocationChanged;
+                while (Geolocation.IsListeningForeground)
+                {
+                    await Task.Delay(300);
+                }
+
+                if (await Geolocation.StartListeningForegroundAsync(new GeolocationListeningRequest(GeolocationAccuracy.Best, TimeSpan.FromSeconds(5))))
+                {
+                    Geolocation.LocationChanged += Geolocation_LocationChanged;
+                }
             }
+        }
+        else
+        {
+            Geolocation.LocationChanged -= Geolocation_LocationChanged;
+            Geolocation.StopListeningForeground();
         }
     }
 

@@ -49,10 +49,14 @@ public partial class GoogleMapsHybridPage : ContentPage
     private async void MyPositionButton_Clicked(object sender, EventArgs e)
     {
         var permission = await Permissions.CheckStatusAsync<Permissions.LocationWhenInUse>().ConfigureAwait(true);
-        
+
         if (permission != PermissionStatus.Granted)
         {
             permission = await Permissions.RequestAsync<Permissions.LocationWhenInUse>().ConfigureAwait(true);
+            if (permission == PermissionStatus.Granted)
+            {
+                await MyMap.ToggleLocationAsync(true);
+            }
         }
 
         if (permission == PermissionStatus.Granted)
